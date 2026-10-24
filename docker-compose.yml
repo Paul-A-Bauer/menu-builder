@@ -1,0 +1,31 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: menubuilder
+      POSTGRES_USER: menu
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-menu}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U menu -d menubuilder"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    # Uncomment to reach the DB from your machine (e.g. for `dotnet run` development):
+    # ports: ["127.0.0.1:5432:5432"]
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ConnectionStrings__Default: Host=db;Port=5432;Database=menubuilder;Username=menu;Password=${POSTGRES_PASSWORD:-menu}
+    ports:
+      - "${APP_PORT:-8080}:8080"
+
+volumes:
+  pgdata:
