@@ -143,6 +143,18 @@ export default function App() {
     } catch (e) { setStatus(`Save failed: ${e.message}`); }
   };
 
+  const moveSection = async (sectionId, direction) => {
+    if (!menu) return;
+    setStatus('Saving…');
+    try {
+      await api.saveMenu(menu);
+      const updated = await api.moveSection(menu.id, sectionId, direction);
+      skipSave.current = true;
+      setMenu(updated);
+      setStatus('Saved');
+    } catch (e) { setStatus(`Save failed: ${e.message}`); }
+  };
+
   const saveAsTemplate = async () => {
     if (!menu || !templateName.trim()) return;
     setStatus('Saving…');
@@ -250,7 +262,17 @@ export default function App() {
           ))}
         </div>
         <label className="columns-control">Areas per row
-          <select value={menu?.columns ?? 2} onChange={(e) => setMenu((current) => ({ ...current, columns: Number(e.target.value) }))} disabled={!menu}>
+          <select value={menu?.columns ?? 2} onChange={(e) => {
+            const columns = Number(e.target.value);
+            setMenu((current) => ({
+              ...current,
+              columns,
+              sections: current.sections.map((section) => ({
+                ...section,
+                columnSpan: Math.min(section.columnSpan ?? 1, columns),
+              })),
+            }));
+          }} disabled={!menu}>
             {[1, 2, 3, 4, 5, 6].map((count) => <option key={count} value={count}>{count}</option>)}
           </select>
         </label>
@@ -273,14 +295,19 @@ export default function App() {
             </div>
 
             <div className="menu-areas" style={menuStyle}>
-              {menu.sections.map((section) => (
+              {menu.sections.map((section, index) => (
                 <Section
                   key={section.id}
                   section={section}
+                  columns={menu.columns}
+                  index={index}
+                  sectionCount={menu.sections.length}
                   onChange={updateSection(section.id)}
                   onAdd={() => setItemTarget({ sectionId: section.id, title: section.title })}
                   onRemove={(itemId) => removeItem(section.id, itemId)}
                   onDelete={() => deleteSection(section.id)}
+                  onMove={(direction) => moveSection(section.id, direction)}
+                  style={{ gridColumn: `span ${Math.min(section.columnSpan ?? 1, menu.columns)}` }}
                 />
               ))}
             </div>

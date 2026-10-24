@@ -77,6 +77,11 @@ api.MapPost("/menus/{id}/sections", async (string id, AddSectionRequest request,
 api.MapDelete("/menus/{id}/sections/{sectionId}", async (string id, string sectionId, MenuService service) =>
     await service.RemoveSectionAsync(id, sectionId) is { } menu ? Results.Ok(menu) : Results.BadRequest("Menu must retain at least one section.") );
 
+api.MapPost("/menus/{id}/sections/{sectionId}/move", async (string id, string sectionId, MoveSectionRequest request, MenuService service) =>
+    await service.MoveSectionAsync(id, sectionId, request.Direction) is { } menu
+        ? Results.Ok(menu)
+        : Results.BadRequest("Area cannot be moved in that direction.") );
+
 api.MapPut("/menus/{id}", async (string id, Menu menu, MenuService service) =>
 {
     try

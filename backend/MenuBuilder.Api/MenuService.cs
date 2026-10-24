@@ -13,7 +13,8 @@ public sealed class MenuService(IMenuRepository repository)
                 ?? throw new KeyNotFoundException("Template not found.");
             menu = new Menu(Guid.NewGuid().ToString(), template.Brand, template.Title, template.Subtitle,
                 template.Footer, template.Sections.Select(section => new Section(
-                        Guid.NewGuid().ToString(), section.Title, section.Step, [NewItem()], NormalizeLayout(section.Layout))).ToList(),
+                    Guid.NewGuid().ToString(), section.Title, section.Step, [NewItem()], NormalizeLayout(section.Layout),
+                    section.ColumnSpan ?? (section.Step == 1 ? template.Columns : 1))).ToList(),
                 template.Theme, template.Columns);
         }
         else
@@ -25,11 +26,11 @@ public sealed class MenuService(IMenuRepository repository)
                 "12 & Under",
                 "Make your pick! Ask your server about allergies.",
                 [
-                    new Section("main", "CHOOSE YOUR\nMAIN", 1, [NewItem(), NewItem()], "row"),
-                    new Section("side", "CHOOSE ONE\nSIDE", 2, [NewItem(), NewItem()], "row"),
-                    new Section("drink", "ADD A DRINK", null, [NewItem()]),
-                    new Section("treat", "ADD A SWEET TREAT", null, [NewItem()]),
-                ], DefaultTheme);
+                    new Section("main", "CHOOSE YOUR\nMAIN", 1, [NewItem(), NewItem()], "row", 3),
+                    new Section("side", "CHOOSE ONE\nSIDE", 2, [NewItem(), NewItem()], "row", 1),
+                    new Section("drink", "ADD A DRINK", null, [NewItem()], "grid", 1),
+                    new Section("treat", "ADD A SWEET TREAT", null, [NewItem()], "grid", 1),
+                ], DefaultTheme, 3);
         }
 
         await repository.SaveAsync(menu);
@@ -76,7 +77,7 @@ public sealed class MenuService(IMenuRepository repository)
         var layout = NormalizeLayout(request.Layout);
         var updated = menu with
         {
-            Sections = [.. menu.Sections, new Section(Guid.NewGuid().ToString(), title, null, [NewItem()], layout)],
+            Sections = [.. menu.Sections, new Section(Guid.NewGuid().ToString(), title, null, [NewItem()], layout, 1)],
         };
         await repository.SaveAsync(updated);
         return updated;
@@ -91,6 +92,21 @@ public sealed class MenuService(IMenuRepository repository)
         return updated;
     }
 
+    public async Task<Menu?> MoveSectionAsync(string menuId, string sectionId, string direction)
+    {
+        var menu = await repository.GetAsync(menuId);
+        if (menu is null || direction is not ("up" or "down")) return null;
+        var index = menu.Sections.FindIndex(section => section.Id == sectionId);
+        var target = direction == "up" ? index - 1 : index + 1;
+        if (index < 0 || target < 0 || target >= menu.Sections.Count) return null;
+
+        var sections = menu.Sections.ToList();
+        (sections[index], sections[target]) = (sections[target], sections[index]);
+        var updated = menu with { Sections = sections };
+        await repository.SaveAsync(updated);
+        return updated;
+    }
+
     public async Task<IReadOnlyList<MenuTemplateSummary>> ListTemplatesAsync() => await repository.ListTemplatesAsync();
 
     public async Task<MenuTemplate> SaveTemplateAsync(string menuId, SaveTemplateRequest request)
@@ -100,7 +116,8 @@ public sealed class MenuService(IMenuRepository repository)
         if (name.Length is < 1 or > 80) throw new ArgumentException("Template name must be 1 to 80 characters.");
         var template = new MenuTemplate(Guid.NewGuid().ToString(), name, menu.Brand, menu.Title, menu.Subtitle,
             menu.Footer, menu.Theme ?? DefaultTheme, Math.Clamp(menu.Columns, 1, 6), menu.Sections.Select(section =>
-                new MenuTemplateSection(section.Title, section.Step, NormalizeLayout(section.Layout, section.Id))).ToList());
+                new MenuTemplateSection(section.Title, section.Step, NormalizeLayout(section.Layout, section.Id),
+                    Math.Clamp(section.ColumnSpan ?? DefaultColumnSpan(section.Id, menu.Columns), 1, menu.Columns))).ToList());
         return await repository.SaveTemplateAsync(template);
     }
 
@@ -147,6 +164,8 @@ public sealed class MenuService(IMenuRepository repository)
             throw new ArgumentException("Theme colors must be six-digit hexadecimal colors.");
         if (menu.Sections.Any(section => section.Layout is not (null or "grid" or "row")))
             throw new ArgumentException("Area layout must be grid or row.");
+        if (menu.Sections.Any(section => section.ColumnSpan is < 1 || section.ColumnSpan > menu.Columns))
+            throw new ArgumentException("Area width must fit within the selected areas-per-row count.");
 
         await repository.SaveAsync(menu with
         {
@@ -155,6 +174,7 @@ public sealed class MenuService(IMenuRepository repository)
             Sections = menu.Sections.Select(section => section with
             {
                 Layout = NormalizeLayout(section.Layout, section.Id),
+                ColumnSpan = section.ColumnSpan ?? DefaultColumnSpan(section.Id, menu.Columns),
             }).ToList(),
         });
     }
@@ -167,6 +187,8 @@ public sealed class MenuService(IMenuRepository repository)
         "grid" => "grid",
         _ => sectionId is "main" or "side" ? "row" : "grid",
     };
+
+    private static int DefaultColumnSpan(string? sectionId, int columns) => sectionId == "main" ? columns : 1;
 
     private static bool IsHexColor(string value) =>
         value.Length == 7 && value[0] == '#' && value.AsSpan(1).ToArray().All(Uri.IsHexDigit);

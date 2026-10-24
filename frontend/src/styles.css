@@ -77,6 +77,9 @@ button, select, input, textarea { font: inherit; }
 .colors input[type="color"] { width: 28px; height: 28px; padding: 2px; border: 1px solid #b9c8d0; border-radius: 5px; background: white; }
 .template-save { margin-left: auto; }
 .layout-control select { max-width: 100%; padding: .15rem; border: 1px solid #c7d2d8; background: white; border-radius: 4px; font-size: .8rem; }
+.area-order { display: flex; gap: .2rem; }
+.area-order button { width: 28px; height: 28px; padding: 0; border: 1px solid #c7d2d8; border-radius: 4px; background: white; color: #33434c; line-height: 1; cursor: pointer; }
+.area-order button:disabled { opacity: .35; cursor: default; }
 .remove-area { border: 0; padding: .25rem; background: transparent; color: #8a2430; font-size: .8rem; cursor: pointer; }
 
 .dialog-backdrop { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 1rem; background: #16232c99; }
@@ -123,6 +126,7 @@ button, select, input, textarea { font: inherit; }
 @media (max-width: 760px) {
   .stage { padding: .5rem; }
   .menu-areas { grid-template-columns: 1fr !important; }
+  .menu-areas > .panel { grid-column: 1 / -1 !important; }
   .panel.layout-row { flex-direction: column; }
   .layout-row .panel-head { width: 100%; align-items: flex-start; }
   .del { opacity: 1; }

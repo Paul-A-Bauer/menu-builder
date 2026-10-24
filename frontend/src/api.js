@@ -28,6 +28,11 @@ export const addSection = (menuId, title, layout) =>
   }).then(json);
 export const removeSection = (menuId, sectionId) =>
   fetch(`/api/menus/${menuId}/sections/${sectionId}`, { method: 'DELETE' }).then(json);
+export const moveSection = (menuId, sectionId, direction) =>
+  fetch(`/api/menus/${menuId}/sections/${sectionId}/move`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ direction }),
+  }).then(json);
 export const listTemplates = () => fetch('/api/templates').then(json);
 export const deleteTemplate = (templateId) => fetch(`/api/templates/${templateId}`, { method: 'DELETE' }).then(json);
 export const saveTemplate = (menuId, name) =>

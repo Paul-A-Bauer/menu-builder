@@ -5,7 +5,7 @@ const MAX_COLS = { main: 5, side: 4, drink: 2, treat: 2 };
 // Spread items evenly across rows (7 items, max 5 -> 4 + 3) so cells shrink as items are added.
 const colsFor = (n, max) => (n <= max ? Math.max(n, 1) : Math.ceil(n / Math.ceil(n / max)));
 
-export default function Section({ section, onChange, onAdd, onRemove, onDelete }) {
+export default function Section({ section, columns, index, sectionCount, onChange, onAdd, onRemove, onDelete, onMove, style }) {
   const { id, step, title, items } = section;
   const layout = section.layout ?? (id === 'main' || id === 'side' ? 'row' : 'grid');
   const patch = (itemId, p) => onChange((s) => ({
@@ -22,7 +22,7 @@ export default function Section({ section, onChange, onAdd, onRemove, onDelete }
   const cols = colsFor(items.length, MAX_COLS[id] ?? 4);
 
   return (
-    <section className={`panel panel-${id} layout-${layout}`}>
+    <section className={`panel panel-${id} layout-${layout}`} style={style}>
       <div className="panel-head">
         {step && (
           <div className="step">
@@ -43,6 +43,17 @@ export default function Section({ section, onChange, onAdd, onRemove, onDelete }
             <option value="row">Side-by-side</option>
           </select>
         </label>
+        <label className="layout-control">Width
+          <select value={Math.min(section.columnSpan ?? 1, columns)} onChange={(e) => onChange((s) => ({ ...s, columnSpan: Number(e.target.value) }))}>
+            {Array.from({ length: columns }, (_, column) => column + 1).map((span) => (
+              <option key={span} value={span}>{span} / {columns}</option>
+            ))}
+          </select>
+        </label>
+        <div className="area-order no-export" aria-label="Arrange area">
+          <button type="button" title="Move area up" aria-label="Move area up" disabled={index === 0} onClick={() => onMove('up')}>↑</button>
+          <button type="button" title="Move area down" aria-label="Move area down" disabled={index === sectionCount - 1} onClick={() => onMove('down')}>↓</button>
+        </div>
         <button className="add no-export" onClick={onAdd}>+ Add item</button>
         {onDelete && <button className="remove-area no-export" onClick={onDelete} aria-label="Remove area">Remove area</button>}
       </div>

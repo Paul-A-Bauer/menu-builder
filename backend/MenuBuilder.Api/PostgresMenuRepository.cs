@@ -157,8 +157,10 @@ public class PostgresMenuRepository(string connectionString) : IMenuRepository
 
     private static Menu NormalizeLayouts(Menu menu) => menu with
     {
-        Sections = menu.Sections.Select(section => section.Layout is null
-            ? section with { Layout = section.Id is "main" or "side" ? "row" : "grid" }
-            : section).ToList(),
+        Sections = menu.Sections.Select(section => section with
+        {
+            Layout = section.Layout ?? (section.Id is "main" or "side" ? "row" : "grid"),
+            ColumnSpan = section.ColumnSpan ?? (section.Id == "main" ? menu.Columns : 1),
+        }).ToList(),
     };
 }
