@@ -3,6 +3,8 @@ namespace MenuBuilder.Api;
 public sealed class MenuService(IMenuRepository repository)
 {
     private static readonly MenuTheme DefaultTheme = new("#bfe1f1", "#ffffff", "#d8212f", "#1f2933");
+    private static readonly PrintSettings DefaultPrint = new("Letter", "Landscape");
+    private static readonly HashSet<string> PaperSizes = ["Letter", "Legal", "Tabloid", "A3", "A4", "A5"];
 
     public async Task<Menu> CreateAsync(string? templateId = null)
     {
@@ -15,7 +17,7 @@ public sealed class MenuService(IMenuRepository repository)
                 template.Footer, template.Sections.Select(section => new Section(
                     Guid.NewGuid().ToString(), section.Title, section.Step, [NewItem()], NormalizeLayout(section.Layout),
                     section.ColumnSpan ?? (section.Step == 1 ? template.Columns : 1))).ToList(),
-                template.Theme, template.Columns);
+                template.Theme, template.Columns, template.Print ?? DefaultPrint);
         }
         else
         {
@@ -30,7 +32,7 @@ public sealed class MenuService(IMenuRepository repository)
                     new Section("side", "CHOOSE ONE\nSIDE", 2, [NewItem(), NewItem()], "row", 1),
                     new Section("drink", "ADD A DRINK", null, [NewItem()], "grid", 1),
                     new Section("treat", "ADD A SWEET TREAT", null, [NewItem()], "grid", 1),
-                ], DefaultTheme, 3);
+                ], DefaultTheme, 3, DefaultPrint);
         }
 
         await repository.SaveAsync(menu);
@@ -117,7 +119,8 @@ public sealed class MenuService(IMenuRepository repository)
         var template = new MenuTemplate(Guid.NewGuid().ToString(), name, menu.Brand, menu.Title, menu.Subtitle,
             menu.Footer, menu.Theme ?? DefaultTheme, Math.Clamp(menu.Columns, 1, 6), menu.Sections.Select(section =>
                 new MenuTemplateSection(section.Title, section.Step, NormalizeLayout(section.Layout, section.Id),
-                    Math.Clamp(section.ColumnSpan ?? DefaultColumnSpan(section.Id, menu.Columns), 1, menu.Columns))).ToList());
+                    Math.Clamp(section.ColumnSpan ?? DefaultColumnSpan(section.Id, menu.Columns), 1, menu.Columns))).ToList(),
+            menu.Print ?? DefaultPrint);
         return await repository.SaveTemplateAsync(template);
     }
 
@@ -166,11 +169,17 @@ public sealed class MenuService(IMenuRepository repository)
             throw new ArgumentException("Area layout must be grid or row.");
         if (menu.Sections.Any(section => section.ColumnSpan is < 1 || section.ColumnSpan > menu.Columns))
             throw new ArgumentException("Area width must fit within the selected areas-per-row count.");
+        var print = menu.Print ?? DefaultPrint;
+        if (!PaperSizes.Contains(print.PaperSize))
+            throw new ArgumentException("Choose a supported standard paper size.");
+        if (print.Orientation is not ("Portrait" or "Landscape"))
+            throw new ArgumentException("Orientation must be Portrait or Landscape.");
 
         await repository.SaveAsync(menu with
         {
             Id = id,
             Theme = theme,
+            Print = print,
             Sections = menu.Sections.Select(section => section with
             {
                 Layout = NormalizeLayout(section.Layout, section.Id),

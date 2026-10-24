@@ -37,13 +37,13 @@ export default function Section({ section, columns, index, sectionCount, onChang
           onChange={(e) => onChange((s) => ({ ...s, title: e.target.value.toUpperCase() }))}
           aria-label="Section title"
         />
-        <label className="layout-control">Layout
+        <label className="layout-control area-layout-control no-export">Layout
           <select value={layout} onChange={(e) => onChange((s) => ({ ...s, layout: e.target.value }))}>
             <option value="grid">Stacked</option>
             <option value="row">Side-by-side</option>
           </select>
         </label>
-        <label className="layout-control">Width
+        <label className="layout-control area-width-control no-export">Width
           <select value={Math.min(section.columnSpan ?? 1, columns)} onChange={(e) => onChange((s) => ({ ...s, columnSpan: Number(e.target.value) }))}>
             {Array.from({ length: columns }, (_, column) => column + 1).map((span) => (
               <option key={span} value={span}>{span} / {columns}</option>
