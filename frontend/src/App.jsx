@@ -33,6 +33,7 @@ export default function App() {
   const [templates, setTemplates] = useState([]);
   const [templateName, setTemplateName] = useState('');
   const [selectedTemplate, setSelectedTemplate] = useState('');
+  const [activeSectionId, setActiveSectionId] = useState(null);
   const [itemTarget, setItemTarget] = useState(null);
   const [newAreaOpen, setNewAreaOpen] = useState(false);
   const [newAreaTitle, setNewAreaTitle] = useState('');
@@ -53,6 +54,7 @@ export default function App() {
 
   const open = useCallback(async (id) => {
     skipSave.current = true;
+    setActiveSectionId(null);
     setMenu(await api.getMenu(id));
   }, []);
 
@@ -60,6 +62,7 @@ export default function App() {
     const m = templateId ? await api.createMenuFromTemplate(templateId) : await api.createMenu();
     await refreshList();
     skipSave.current = true;
+    setActiveSectionId(null);
     setMenu(m);
   }, [refreshList]);
 
@@ -107,7 +110,7 @@ export default function App() {
       observer.disconnect();
       window.removeEventListener('resize', fit);
     };
-  }, [menu, paperRatio]);
+  }, [menu, paperRatio, activeSectionId]);
 
   // Debounced autosave
   useEffect(() => {
@@ -330,6 +333,8 @@ export default function App() {
   };
 
   const theme = menu?.theme ?? DEFAULT_THEME;
+  const activeSection = menu?.sections.find((section) => section.id === activeSectionId) ?? null;
+  const activeSectionIndex = activeSection ? menu.sections.findIndex((section) => section.id === activeSection.id) : -1;
   const menuStyle = menu ? {
     '--menu-bg': theme.background,
     '--panel-bg': theme.panel,
@@ -339,27 +344,38 @@ export default function App() {
     gridTemplateColumns: `repeat(${Math.min(Math.max(menu.columns || 2, 1), 6)}, minmax(0, 1fr))`,
   } : undefined;
   return (
-    <div className="app">
+    <div className={`app${activeSection ? ' editing-section' : ''}`}>
       <header className="toolbar">
-        <select value={menu?.id ?? ''} onChange={(e) => open(e.target.value)}>
-          {menus.map((m) => <option key={m.id} value={m.id}>{m.title || 'Untitled'}</option>)}
-        </select>
-        <button onClick={() => create()}>New menu</button>
-        <select aria-label="Saved templates" value={selectedTemplate} onChange={(e) => setSelectedTemplate(e.target.value)}>
-          <option value="">Choose template</option>
-          {templates.map((template) => <option key={template.id} value={template.id}>{template.name}</option>)}
-        </select>
-        <button onClick={() => selectedTemplate && create(selectedTemplate)} disabled={!selectedTemplate}>Use template</button>
-        <button onClick={removeTemplate} disabled={!selectedTemplate}>Delete template</button>
-        <button onClick={remove} disabled={!menu}>Delete</button>
-        <span className="spacer" />
-        <span className="status">{status}</span>
-        <button onClick={print} disabled={!menu}>Print</button>
-        <button onClick={exportPng} disabled={!menu}>Export image</button>
-        <button className="primary" onClick={exportPdf} disabled={!menu}>Export PDF</button>
+        {activeSection ? (
+          <>
+            <button onClick={() => setActiveSectionId(null)}>Back to overview</button>
+            <strong className="active-area-label">{activeSection.title.replaceAll('\n', ' ')}</strong>
+            <span className="spacer" />
+            <span className="status">{status}</span>
+          </>
+        ) : (
+          <>
+            <select value={menu?.id ?? ''} onChange={(e) => open(e.target.value)}>
+              {menus.map((m) => <option key={m.id} value={m.id}>{m.title || 'Untitled'}</option>)}
+            </select>
+            <button onClick={() => create()}>New menu</button>
+            <select aria-label="Saved templates" value={selectedTemplate} onChange={(e) => setSelectedTemplate(e.target.value)}>
+              <option value="">Choose template</option>
+              {templates.map((template) => <option key={template.id} value={template.id}>{template.name}</option>)}
+            </select>
+            <button onClick={() => selectedTemplate && create(selectedTemplate)} disabled={!selectedTemplate}>Use template</button>
+            <button onClick={removeTemplate} disabled={!selectedTemplate}>Delete template</button>
+            <button onClick={remove} disabled={!menu}>Delete</button>
+            <span className="spacer" />
+            <span className="status">{status}</span>
+            <button onClick={print} disabled={!menu}>Print</button>
+            <button onClick={exportPng} disabled={!menu}>Export image</button>
+            <button className="primary" onClick={exportPdf} disabled={!menu}>Export PDF</button>
+          </>
+        )}
       </header>
 
-      <div className="editor-tools">
+      {!activeSection && <div className="editor-tools">
         <div className="tool-group colors" aria-label="Menu colors">
           {[['background', 'Canvas'], ['panel', 'Areas'], ['accent', 'Accent'], ['text', 'Text']].map(([key, label]) => (
             <label key={key}>{label}<input type="color" value={theme[key]} onChange={(e) => setMenu((current) => ({
@@ -409,9 +425,9 @@ export default function App() {
           <input aria-label="Template name" placeholder="Template name" value={templateName} onChange={(e) => setTemplateName(e.target.value)} />
           <button onClick={saveAsTemplate} disabled={!menu || !templateName.trim()}>Save template</button>
         </div>
-      </div>
+      </div>}
 
-      {menu && (
+      {menu && !activeSection && (
         <main className="stage">
           <div className={`paper-frame paper-${printSettings.orientation.toLowerCase()}`} ref={paperRef} style={paperStyle}>
             <article className="menu" ref={menuRef} style={menuStyle}>
@@ -428,9 +444,11 @@ export default function App() {
                   <Section
                     key={section.id}
                     section={section}
+                    overview
                     columns={menu.columns}
                     index={index}
                     sectionCount={menu.sections.length}
+                    onSelect={() => setActiveSectionId(section.id)}
                     onChange={updateSection(section.id)}
                     onAdd={() => setItemTarget({ sectionId: section.id, title: section.title })}
                     onRemove={(itemId) => removeItem(section.id, itemId)}
@@ -444,6 +462,21 @@ export default function App() {
               <input className="footer" value={menu.footer} onChange={field('footer')} aria-label="Footer note" />
             </article>
           </div>
+        </main>
+      )}
+      {menu && activeSection && (
+        <main className="section-focus">
+          <Section
+            section={activeSection}
+            columns={menu.columns}
+            index={activeSectionIndex}
+            sectionCount={menu.sections.length}
+            onChange={updateSection(activeSection.id)}
+            onAdd={() => setItemTarget({ sectionId: activeSection.id, title: activeSection.title })}
+            onRemove={(itemId) => removeItem(activeSection.id, itemId)}
+            onDelete={() => deleteSection(activeSection.id)}
+            onMove={(direction) => moveSection(activeSection.id, direction)}
+          />
         </main>
       )}
       {itemTarget && (

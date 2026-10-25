@@ -5,7 +5,7 @@ const MAX_COLS = { main: 5, side: 4, drink: 2, treat: 2 };
 // Spread items evenly across rows (7 items, max 5 -> 4 + 3) so cells shrink as items are added.
 const colsFor = (n, max) => (n <= max ? Math.max(n, 1) : Math.ceil(n / Math.ceil(n / max)));
 
-export default function Section({ section, columns, index, sectionCount, onChange, onAdd, onRemove, onDelete, onMove, style }) {
+export default function Section({ section, columns, index, sectionCount, overview = false, onSelect, onChange, onAdd, onRemove, onDelete, onMove, style }) {
   const { id, step, title, items } = section;
   const layout = section.layout ?? (id === 'main' || id === 'side' ? 'row' : 'grid');
   const patch = (itemId, p) => onChange((s) => ({
@@ -22,7 +22,7 @@ export default function Section({ section, columns, index, sectionCount, onChang
   const cols = colsFor(items.length, MAX_COLS[id] ?? 4);
 
   return (
-    <section className={`panel panel-${id} layout-${layout}`} style={style}>
+    <section className={`panel panel-${id} layout-${layout}${overview ? ' overview-panel' : ''}`} style={style}>
       <div className="panel-head">
         {step && (
           <div className="step">
@@ -30,60 +30,69 @@ export default function Section({ section, columns, index, sectionCount, onChang
             <span className="step-num">{step}</span>
           </div>
         )}
-        <textarea
-          className={step ? 'panel-title stacked' : 'panel-title inline'}
-          rows={title.split('\n').length}
-          value={title}
-          onChange={(e) => onChange((s) => ({ ...s, title: e.target.value.toUpperCase() }))}
-          aria-label="Section title"
-        />
-        <label className="layout-control area-layout-control no-export">Layout
-          <select value={layout} onChange={(e) => onChange((s) => ({ ...s, layout: e.target.value }))}>
-            <option value="grid">Stacked</option>
-            <option value="row">Side-by-side</option>
-          </select>
-        </label>
-        <label className="layout-control area-width-control no-export">Width
-          <select value={Math.min(section.columnSpan ?? 1, columns)} onChange={(e) => onChange((s) => ({ ...s, columnSpan: Number(e.target.value) }))}>
-            {Array.from({ length: columns }, (_, column) => column + 1).map((span) => (
-              <option key={span} value={span}>{span} / {columns}</option>
-            ))}
-          </select>
-        </label>
-        <div className="area-order no-export" aria-label="Arrange area">
-          <button type="button" title="Move area up" aria-label="Move area up" disabled={index === 0} onClick={() => onMove('up')}>↑</button>
-          <button type="button" title="Move area down" aria-label="Move area down" disabled={index === sectionCount - 1} onClick={() => onMove('down')}>↓</button>
-        </div>
-        <button className="add no-export" onClick={onAdd}>+ Add item</button>
-        {onDelete && <button className="remove-area no-export" onClick={onDelete} aria-label="Remove area">Remove area</button>}
+        {overview ? (
+          <h2 className={`panel-title ${step ? 'stacked' : 'inline'}`}>{title}</h2>
+        ) : (
+          <>
+            <textarea
+              className={step ? 'panel-title stacked' : 'panel-title inline'}
+              rows={title.split('\n').length}
+              value={title}
+              onChange={(e) => onChange((s) => ({ ...s, title: e.target.value.toUpperCase() }))}
+              aria-label="Section title"
+            />
+            <label className="layout-control area-layout-control no-export">Layout
+              <select value={layout} onChange={(e) => onChange((s) => ({ ...s, layout: e.target.value }))}>
+                <option value="grid">Stacked</option>
+                <option value="row">Side-by-side</option>
+              </select>
+            </label>
+            <label className="layout-control area-width-control no-export">Width
+              <select value={Math.min(section.columnSpan ?? 1, columns)} onChange={(e) => onChange((s) => ({ ...s, columnSpan: Number(e.target.value) }))}>
+                {Array.from({ length: columns }, (_, column) => column + 1).map((span) => (
+                  <option key={span} value={span}>{span} / {columns}</option>
+                ))}
+              </select>
+            </label>
+            <div className="area-order no-export" aria-label="Arrange area">
+              <button type="button" title="Move area up" aria-label="Move area up" disabled={index === 0} onClick={() => onMove('up')}>↑</button>
+              <button type="button" title="Move area down" aria-label="Move area down" disabled={index === sectionCount - 1} onClick={() => onMove('down')}>↓</button>
+            </div>
+            <button className="add no-export" onClick={onAdd}>+ Add item</button>
+            {onDelete && <button className="remove-area no-export" onClick={onDelete} aria-label="Remove area">Remove area</button>}
+          </>
+        )}
       </div>
 
       <div className="items" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
         {items.map((item) => (
           <div className="item" key={item.id}>
-            <label className="pic" title="Click to upload a photo">
-              {item.imageId ? (
-                <img src={imageUrl(item.imageId)} alt={item.name} crossOrigin="anonymous" />
-              ) : (
-                <span className="ph no-export">📷<br />Add photo</span>
-              )}
-              <input
-                type="file"
-                accept="image/*"
-                hidden
-                onChange={(e) => { upload(item.id, e.target.files[0]); e.target.value = ''; }}
-              />
-            </label>
-            <input
-              className="name"
-              value={item.name}
-              placeholder="Item name"
-              onChange={(e) => patch(item.id, { name: e.target.value })}
-            />
-            <button className="del no-export" onClick={() => onRemove(item.id)} aria-label="Remove item">×</button>
+            {overview ? (
+              <div className="pic">
+                {item.imageId ? <img src={imageUrl(item.imageId)} alt={item.name} crossOrigin="anonymous" /> : <span className="ph">📷</span>}
+              </div>
+            ) : (
+              <label className="pic" title="Click to upload a photo">
+                {item.imageId ? <img src={imageUrl(item.imageId)} alt={item.name} crossOrigin="anonymous" /> : <span className="ph">📷<br />Add photo</span>}
+                <input
+                  type="file"
+                  accept="image/*"
+                  hidden
+                  onChange={(e) => { upload(item.id, e.target.files[0]); e.target.value = ''; }}
+                />
+              </label>
+            )}
+            {overview ? <span className="name item-name-preview">{item.name || 'Untitled item'}</span> : <input
+                className="name"
+                value={item.name}
+                placeholder="Item name"
+                onChange={(e) => patch(item.id, { name: e.target.value })}
+              />}
+            {!overview && <button className="del no-export" onClick={() => onRemove(item.id)} aria-label="Remove item">×</button>}
           </div>
         ))}
       </div>
+      {overview && <button className="open-section no-export" type="button" aria-label={`Edit ${title.replaceAll('\n', ' ')}`} onClick={onSelect}>Edit area</button>}
     </section>
   );
 }
